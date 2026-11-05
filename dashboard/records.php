@@ -2,7 +2,11 @@
 declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: private, no-store');
-if (empty($_SERVER['REMOTE_USER'])) {
+$check = isset($_GET['conexion']) && $_GET['conexion'] === '1';
+if ($check) {
+    header('Access-Control-Allow-Origin: https://xdpromagnun.github.io');
+}
+if (!$check && empty($_SERVER['REMOTE_USER'])) {
     http_response_code(403);
     echo '{"error":"Acceso restringido"}';
     exit;
@@ -10,6 +14,11 @@ if (empty($_SERVER['REMOTE_USER'])) {
 try {
     $user = getenv('PROCRAST_DB_USER');
     $password = getenv('PROCRAST_DB_PASSWORD');
+    if (!$user && !$password) {
+        $keyPath = dirname(__DIR__, 2) . '/procrast-panel-db.key';
+        $user = 'unisalud_panel_lectura';
+        $password = is_readable($keyPath) ? trim(file_get_contents($keyPath)) : '';
+    }
     if (!$user || !$password) {
         throw new RuntimeException('Configuracion incompleta');
     }
@@ -19,6 +28,11 @@ try {
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_STRINGIFY_FETCHES => true
     ]);
+    if ($check) {
+        $db->query('SELECT id FROM estudiantes LIMIT 0');
+        echo '{"conectada":true}';
+        exit;
+    }
     $db->exec('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
     $db->beginTransaction();
     $data = [
