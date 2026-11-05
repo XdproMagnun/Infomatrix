@@ -1,0 +1,23 @@
+/* XLSX minimal válido: Open XML en ZIP sin compresión. Sin servicios externos. */
+(() => {
+ const encode = s => new TextEncoder().encode(s);
+ const xml = s => String(s ?? '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
+ const safeCSV = s => /^[\s]*[=+@-]/.test(String(s)) ? "'"+s : s;
+ const crc32 = bytes => {let crc=0xffffffff;for(const b of bytes){crc^=b;for(let i=0;i<8;i++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}return (crc^0xffffffff)>>>0;};
+ function zip(files){let offset=0,centralSize=0;const parts=[],central=[];for(const [name,text] of Object.entries(files)){const n=encode(name),body=encode(text),crc=crc32(body),header=new Uint8Array(30+n.length),v=new DataView(header.buffer);v.setUint32(0,0x04034b50,true);v.setUint16(4,20,true);v.setUint32(14,crc,true);v.setUint32(18,body.length,true);v.setUint32(22,body.length,true);v.setUint16(26,n.length,true);header.set(n,30);parts.push(header,body);const c=new Uint8Array(46+n.length),cv=new DataView(c.buffer);cv.setUint32(0,0x02014b50,true);cv.setUint16(4,20,true);cv.setUint16(6,20,true);cv.setUint32(16,crc,true);cv.setUint32(20,body.length,true);cv.setUint32(24,body.length,true);cv.setUint16(28,n.length,true);cv.setUint32(42,offset,true);c.set(n,46);central.push(c);centralSize+=c.length;offset+=header.length+body.length;}const end=new Uint8Array(22),ev=new DataView(end.buffer);ev.setUint32(0,0x06054b50,true);ev.setUint16(8,central.length,true);ev.setUint16(10,central.length,true);ev.setUint32(12,centralSize,true);ev.setUint32(16,offset,true);return new Blob([...parts,...central,end],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});}
+ const colName = n => {let s='';for(n++;n;n=Math.floor((n-1)/26))s=String.fromCharCode(65+(n-1)%26)+s;return s;};
+ window.makeExport=(rows,columns,format)=>{
+  const grid=[columns,...rows.map(r=>columns.map(c=>r[c] ?? ''))];
+  if(format==='csv')return new Blob(['\uFEFF'+grid.map(row=>row.map(v=>'"'+String(safeCSV(v)).replace(/"/g,'""')+'"').join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});
+  if(format==='txt')return new Blob(['\uFEFF'+rows.map((r,i)=>`REGISTRO ${i+1}\r\n`+columns.map(c=>`${c}: ${r[c] ?? ''}`).join('\r\n')).join('\r\n\r\n------------------------------\r\n\r\n')],{type:'text/plain;charset=utf-8'});
+  const numeric=new Set(['numero_semana','minutos_realizados','emocional','conductual','cognitiva','global_score']);
+  const sheet=grid.map((row,i)=>`<row r="${i+1}">${row.map((value,j)=>{const ref=colName(j)+(i+1);return i>0 && numeric.has(columns[j]) && value!=='' && Number.isFinite(Number(value))?`<c r="${ref}"><v>${Number(value)}</v></c>`:`<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${xml(value)}</t></is></c>`;}).join('')}</row>`).join('');
+  return zip({
+   '[Content_Types].xml':'<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>',
+   '_rels/.rels':'<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+   'xl/workbook.xml':'<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Muestra" sheetId="1" r:id="rId1"/></sheets></workbook>',
+   'xl/_rels/workbook.xml.rels':'<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
+   'xl/worksheets/sheet1.xml':`<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetData>${sheet}</sheetData><autoFilter ref="A1:${colName(columns.length-1)}${grid.length}"/></worksheet>`
+  });
+ };
+})();

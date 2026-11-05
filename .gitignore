@@ -1,0 +1,5 @@
+*.sql
+/dashboard/data.js
+*.xlsx
+.env
+.env.*
