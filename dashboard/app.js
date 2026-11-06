@@ -2,9 +2,35 @@ const githubLive = location.hostname === 'xdpromagnun.github.io';
 const live = githubLive || document.documentElement.dataset.source === 'mariadb';
 const recordsUrl = githubLive ? 'https://unisalud.com.mx/procrast-panel/records.php' : 'records.php';
 let accessHeader = '';
+let sessionVersion = 0;
+const signOut = document.querySelector('#sign-out');
+const menuToggle = document.querySelector('.menu-toggle');
+function closeMenu() {
+ document.querySelector('.sidebar').classList.remove('menu-open');
+ menuToggle.setAttribute('aria-expanded', 'false');
+}
+menuToggle.onclick = () => {
+ const open = menuToggle.getAttribute('aria-expanded') !== 'true';
+ document.querySelector('.sidebar').classList.toggle('menu-open', open);
+ menuToggle.setAttribute('aria-expanded', String(open));
+};
+document.addEventListener('keydown', event => {if (event.key === 'Escape') closeMenu();});
+signOut.onclick = () => {
+ sessionVersion++;
+ accessHeader = '';
+ data = undefined;
+ pageIndex = 0;
+ document.querySelector('#detail').close();
+ document.querySelector('#detail-content').replaceChildren();
+ clearTimeout(window.toastTimer);
+ document.querySelector('#toast').style.display = 'none';
+ closeMenu();
+ showSignIn();
+ main.focus();
+};
 async function requestRecords() {
   const headers = accessHeader ? {Authorization: accessHeader} : {};
-  return fetch(recordsUrl, {headers, cache: 'no-store', signal: AbortSignal.timeout(15000)});
+  return fetch(recordsUrl, {headers, credentials: 'omit', cache: 'no-store', signal: AbortSignal.timeout(15000)});
 }
 async function loadData() {
   if (!live) return window.DASHBOARD_DATA;
@@ -38,7 +64,7 @@ function overview(){
  <div class="grid"><section class="card"><div class="card-head"><div><h2>Avance por semana del plan</h2><p>Actividades completadas · todas las dimensiones</p></div><span class="tag">7 semanas</span></div><div class="bars" role="img" aria-label="Actividades completadas por semana: ${weekCounts.join(', ')}">${weekCounts.map((n,i)=>`<div class="bar-col"><b>${n}</b><div class="bar" style="height:${n/Math.max(...weekCounts,1)*100}px;background:${i===0?'#129eaa':'#88d4d7'}"></div><small>Sem ${i+1}</small></div>`).join('')}</div><p class="chart-note">La semana corresponde al plan, no a una semana del calendario.</p></section><section class="card"><div class="card-head"><div><h2>Estado de las actividades</h2><p>Una mirada al proceso de participación</p></div></div><div class="distribution"><div class="donut" style="background:conic-gradient(${stops.join(',')})"><div><strong>${data.activities.length}</strong><small>actividades</small></div></div><div class="legend">${states.map((s,i)=>`<p><span><i style="background:${colors[i]}"></i>${labels[s]}</span><b>${data.activities.filter(a=>a.estado===s).length}</b></p>`).join('')}</div></div></section></div>
  <section class="card"><div class="card-head"><div><h2>Últimas respuestas</h2><p>Una ventana a la experiencia de los estudiantes</p></div><a class="link" href="#actividades">Ver todas &nbsp; <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></a></div>${activityTable([...data.activities].filter(a=>a.respondido_en).sort((a,b)=>b.respondido_en.localeCompare(a.respondido_en)).slice(0,4))}</section><p class="chart-note">Fuente: ${esc(data.source)}. Los indicadores describen la consulta; no representan cambios en tiempo real ni una medida clínica.</p>`;
 }
-function activityTable(rows){return `<div class="table-wrap"><table><thead><tr><th>REGISTRO / PLAN</th><th>DIMENSIÓN</th><th>RESPUESTA</th><th>ESTADO</th><th>FECHA DE RESPUESTA</th><th></th></tr></thead><tbody>${rows.map(a=>`<tr><td><span class="id">#${esc(a.id)}</span><br><small>Plan ${esc(a.plan_id)} · ${a.estudiante_id?'ID '+esc(a.estudiante_id):'Sin vínculo'}</small></td><td>${esc(labels[a.dimension])}</td><td class="text">${esc((a.observacion || a.distractor || 'Sin respuesta cualitativa').slice(0,85))}${(a.observacion || a.distractor || '').length>85?'…':''}</td><td>${pill(a.estado)}</td><td>${fmtDate(a.respondido_en)}</td><td><button class="link" data-detail="${esc(a.id)}" aria-label="Ver registro ${esc(a.id)}">Ver <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></button></td></tr>`).join('') || '<tr><td colspan="6" class="empty">No hay registros que coincidan con los criterios.</td></tr>'}</tbody></table></div>`;}
+function activityTable(rows){return `<div class="table-wrap"><table class="record-table"><thead><tr><th>REGISTRO / PLAN</th><th>DIMENSIÓN</th><th>RESPUESTA</th><th>ESTADO</th><th>FECHA DE RESPUESTA</th><th></th></tr></thead><tbody>${rows.map(a=>`<tr><td data-label="Registro / plan"><span class="id">#${esc(a.id)}</span><br><small>Plan ${esc(a.plan_id)} · ${a.estudiante_id?'ID '+esc(a.estudiante_id):'Sin vínculo'}</small></td><td data-label="Dimensión">${esc(labels[a.dimension])}</td><td class="text" data-label="Respuesta">${esc((a.observacion || a.distractor || 'Sin respuesta cualitativa').slice(0,85))}${(a.observacion || a.distractor || '').length>85?'…':''}</td><td data-label="Estado">${pill(a.estado)}</td><td data-label="Respondido">${fmtDate(a.respondido_en)}</td><td><button class="link" data-detail="${esc(a.id)}" aria-label="Ver registro ${esc(a.id)}">Ver <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></button></td></tr>`).join('') || '<tr><td colspan="6" class="empty">No hay registros que coincidan con los criterios.</td></tr>'}</tbody></table></div>`;}
 function filters(exportMode=false){return `<div class="filters">${exportMode?'<label>Conjunto de datos<select id="dataset"><option value="assessments">Evaluaciones</option><option value="activities">Actividades y respuestas</option></select></label>':''}<label>ID de estudiante desde<input id="idFrom" type="number" min="1" step="1" placeholder="Sin mínimo"></label><label>ID de estudiante hasta<input id="idTo" type="number" min="1" step="1" placeholder="Sin máximo"></label><label>Desde<input id="dateFrom" type="date"></label><label>Hasta<input id="dateTo" type="date"></label></div><div class="filters"><label>Dimensión<select id="dimension"><option value="">Todas las dimensiones</option><option value="EMOCIONAL">Emocional</option><option value="CONDUCTUAL">Conductual</option><option value="COGNITIVA">Cognitiva</option><option value="EMPATE">Empate</option></select></label><label>Estado<select id="state"><option value="">Todos los estados</option>${(exportMode?['COMPLETADA','EN_CURSO','ABANDONADA']:['COMPLETADA','PENDIENTE','PARCIAL','NO_REALIZADA']).map(s=>`<option value="${s}">${labels[s]}</option>`).join('')}</select></label><button id="reset">Restablecer</button></div><p class="chart-note" id="date-help">${exportMode?'Evaluaciones: fecha de inicio.':'Actividades: fecha programada.'} Rangos inclusivos.</p><p id="filter-error" role="alert" style="color:#b64755"></p>`;}
 function getRows(kind){
  const value=id=>document.getElementById(id)?.value || '';
@@ -53,7 +79,7 @@ function pagination(total){return `<div class="pagination"><span>${total} regist
 function activities(){main.innerHTML=title('Explora las observaciones y los distractores registrados por el bot.')+missingLinks()+`<section class="card">${filters()}<div id="results"></div></section>`;bindFilters(updateActivities);updateActivities();}
 function updateActivities(){const rows=getRows('activities');document.querySelector('#results').innerHTML=activityTable(rows.slice(pageIndex*10,(pageIndex+1)*10))+pagination(rows.length);}
 function students(){main.innerHTML=title('Consulta evaluaciones por ID interno, sin mostrar nombres ni datos de Telegram.')+`<section class="card"><div class="filters"><label>Buscar ID de estudiante<input type="number" min="1" id="studentSearch" placeholder="Escribe un ID exacto"></label><label>Participación<select id="studentStatus"><option value="">Todos</option><option value="1">Activos</option><option value="0">Inactivos</option></select></label></div><div id="students-results"></div></section>`;document.querySelectorAll('.filters input,.filters select').forEach(el=>el.oninput=()=>{pageIndex=0;updateStudents();});updateStudents();}
-function updateStudents(){const id=document.querySelector('#studentSearch').value,status=document.querySelector('#studentStatus').value;const rows=data.students.filter(s=>(!id || s.id===id) && (!status || s.activo===status));document.querySelector('#students-results').innerHTML=`<div class="table-wrap"><table><thead><tr><th>ESTUDIANTE</th><th>REGISTRO</th><th>PARTICIPACIÓN</th><th>EVALUACIONES</th><th>ÚLTIMO PUNTAJE GLOBAL</th><th></th></tr></thead><tbody>${rows.slice(pageIndex*10,(pageIndex+1)*10).map(s=>{const apps=data.assessments.filter(a=>a.estudiante_id===s.id).sort((a,b)=>b.inicio.localeCompare(a.inicio));return `<tr><td class="id">ID ${esc(s.id)}</td><td>${fmtDate(s.creado_en)}</td><td>${s.activo==='1'?'Activo':'Inactivo'}</td><td>${apps.length}</td><td>${apps[0]?.global_score ?? 'Sin resultado'}</td><td><button class="link" data-student="${esc(s.id)}">Ver seguimiento <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></button></td></tr>`;}).join('') || '<tr><td colspan="6" class="empty">No se encontraron estudiantes.</td></tr>'}</tbody></table></div>${pagination(rows.length)}`;}
+function updateStudents(){const id=document.querySelector('#studentSearch').value,status=document.querySelector('#studentStatus').value;const rows=data.students.filter(s=>(!id || s.id===id) && (!status || s.activo===status));document.querySelector('#students-results').innerHTML=`<div class="table-wrap"><table class="record-table"><thead><tr><th>ESTUDIANTE</th><th>REGISTRO</th><th>PARTICIPACIÓN</th><th>EVALUACIONES</th><th>ÚLTIMO PUNTAJE GLOBAL</th><th></th></tr></thead><tbody>${rows.slice(pageIndex*10,(pageIndex+1)*10).map(s=>{const apps=data.assessments.filter(a=>a.estudiante_id===s.id).sort((a,b)=>b.inicio.localeCompare(a.inicio));return `<tr><td class="id" data-label="Estudiante">ID ${esc(s.id)}</td><td data-label="Registro">${fmtDate(s.creado_en)}</td><td data-label="Participación">${s.activo==='1'?'Activo':'Inactivo'}</td><td data-label="Evaluaciones">${apps.length}</td><td data-label="Último puntaje">${apps[0]?.global_score ?? 'Sin resultado'}</td><td><button class="link" data-student="${esc(s.id)}">Ver seguimiento <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></button></td></tr>`;}).join('') || '<tr><td colspan="6" class="empty">No se encontraron estudiantes.</td></tr>'}</tbody></table></div>${pagination(rows.length)}`;}
 function exportsPage(){main.innerHTML=title('Define tu muestra y descarga los registros para tu análisis.')+`<div class="export-grid"><section class="card"><h2>Selecciona tu muestra</h2><p class="section-description">Elige los registros que quieres analizar.</p>${filters(true)}<div id="export-notice" class="notice info">Las evaluaciones están vinculadas al ID interno del estudiante.</div><section class="field-section" aria-labelledby="fields-title"><div class="field-heading"><div><h2 id="fields-title">Personaliza tus campos</h2><p class="section-description">Selecciona la información que llevará tu archivo.</p></div><span id="column-count" class="selection-count" role="status"></span></div><div class="field-actions"><button type="button" id="select-columns">Seleccionar todos</button><button type="button" id="clear-columns">Limpiar selección</button></div><div id="columns"></div></section><div class="card-head" style="margin-top:28px"><h2>Vista previa de la muestra</h2><span class="tag">Primeros 5 registros</span></div><div id="export-preview"></div></section><aside class="card export-summary"><p class="eyebrow">TU EXPORTACIÓN</p><h2>Lista para analizar</h2><strong class="export-total" id="export-count">0</strong><p class="subtitle">registros que cumplen tus criterios</p><div class="format-list"><label><input type="radio" name="format" value="csv" checked><div><b>CSV</b><small>R, Python y análisis de datos</small></div></label><label><input type="radio" name="format" value="xlsx"><div><b>Excel · XLSX</b><small>Para trabajar en hojas de cálculo</small></div></label><label><input type="radio" name="format" value="txt"><div><b>Texto · TXT</b><small>Lectura y análisis cualitativo</small></div></label></div><button id="download" class="primary full"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3v12m-5-5 5 5 5-5M4 16v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg> &nbsp; Descargar muestra</button><p class="chart-note">La descarga incluye únicamente los campos seleccionados. Los textos abiertos pueden contener información identificable: revísalos antes de compartirlos.</p><p id="export-feedback" role="status" class="chart-note"></p></aside></div>`;
  bindFilters(updateExport);document.querySelector('#dataset').addEventListener('input',()=>{const activity=document.querySelector('#dataset').value==='activities';document.querySelector('#state').innerHTML='<option value="">Todos los estados</option>'+(activity?['COMPLETADA','PENDIENTE','PARCIAL','NO_REALIZADA']:['COMPLETADA','EN_CURSO','ABANDONADA']).map(s=>`<option value="${s}">${labels[s]}</option>`).join('');setColumns();updateExport();});setColumns();updateExport();document.querySelector('#download').onclick=download;
  document.querySelector('#select-columns').onclick=()=>selectColumns(true);
@@ -95,13 +121,14 @@ function connection() {
   }
 }
 function help(){main.innerHTML=title('Herramientas para administrar con claridad y analizar con contexto.')+`<div class="support-grid"><section class="card"><p class="eyebrow">01 · EXPLORA</p><h2>Sigue la participación</h2><p>Busca un ID en Estudiantes para consultar sus evaluaciones PRE, POST y de seguimiento.</p><a class="link" href="#estudiantes">Ver estudiantes <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></a></section><section class="card"><p class="eyebrow">02 · COMPRENDE</p><h2>Escucha las respuestas</h2><p>Revisa las observaciones y los distractores por dimensión, estado y fecha programada.</p><a class="link" href="#actividades">Explorar respuestas <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></a></section><section class="card"><p class="eyebrow">03 · ANALIZA</p><h2>Construye tu muestra</h2><p>Combina rangos de ID y fechas, selecciona columnas y descarga CSV, XLSX o texto.</p><a class="link" href="#exportaciones">Ir a descargas <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></a></section></div><section class="card" style="margin-top:22px"><h2 style="margin-bottom:20px">Preguntas frecuentes</h2><details open><summary>¿Qué significa el ID del estudiante?</summary><p>Es el identificador interno de la tabla estudiantes. No es el ID de actividad, el ID de plan ni el identificador de Telegram. Se conserva para vincular las evaluaciones de una misma persona.</p></details><details><summary>¿Qué fecha se utiliza para filtrar?</summary><p>En evaluaciones se usa inicio; en actividades, fecha_programada. Los dos extremos del rango están incluidos. La fecha de respuesta se muestra por separado.</p></details><details><summary>¿Por qué algunas actividades aparecen sin vínculo?</summary><p>Una actividad puede carecer de un plan asociado. No se infiere una identidad a partir de números similares. Para resolverlo, recupera planes y enlaza actividades_plan.plan_id con planes.id y planes.estudiante_id con estudiantes.id.</p></details><details><summary>¿Los datos son anónimos?</summary><p>Se omiten nombres, alias y Telegram. Los IDs permiten seguimiento y los textos libres pueden contener detalles identificables; por ello son datos seudonimizados, no una garantía de anonimato.</p></details><details><summary>¿Cómo se mide el progreso?</summary><p>Se muestran actividades completadas y evaluaciones registradas. El porcentaje de actividades completadas usa todas las actividades programadas de la consulta, incluidas las futuras; no debe interpretarse como eficacia del bot ni resultado clínico.</p></details></section>`;}
-function route(){page=location.hash.slice(1) || 'resumen';if(!titles[page])page='resumen';pageIndex=0;document.querySelector('#breadcrumb').textContent=titles[page];document.querySelectorAll('[data-page]').forEach(el=>{el.classList.toggle('active',el.dataset.page===page);if(el.dataset.page===page)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');});({resumen:overview,estudiantes:students,actividades:activities,exportaciones:exportsPage,conexion:connection,ayuda:help}[page])();}
+function route(){if(!data)return;closeMenu();page=location.hash.slice(1) || 'resumen';if(!titles[page])page='resumen';pageIndex=0;document.querySelector('#breadcrumb').textContent=titles[page];document.querySelectorAll('[data-page]').forEach(el=>{el.classList.toggle('active',el.dataset.page===page);if(el.dataset.page===page)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');});({resumen:overview,estudiantes:students,actividades:activities,exportaciones:exportsPage,conexion:connection,ayuda:help}[page])();}
 main.addEventListener('click',e=>{const go=e.target.closest('[data-go]');if(go)location.hash=go.dataset.go;const pg=e.target.closest('[data-paginate]');if(pg){pageIndex+=Number(pg.dataset.paginate);(page==='estudiantes'?updateStudents:updateActivities)();}const detail=e.target.closest('[data-detail]'),student=e.target.closest('[data-student]');if(detail){const a=data.activities.find(a=>a.id===detail.dataset.detail);document.querySelector('#detail-content').innerHTML=`<p class="eyebrow">ACTIVIDAD #${esc(a.id)} · PLAN ${esc(a.plan_id)}</p><h2>Detalle de la respuesta</h2>${Object.entries(a).map(([k,v])=>`<div class="detail-item"><small>${esc(k)}</small>${esc(v ?? 'Sin dato')}</div>`).join('')}`;document.querySelector('#detail').showModal();}if(student){const apps=data.assessments.filter(a=>a.estudiante_id===student.dataset.student).sort((a,b)=>a.inicio.localeCompare(b.inicio));document.querySelector('#detail-content').innerHTML=`<p class="eyebrow">SEGUIMIENTO INDIVIDUAL</p><h2>Estudiante ID ${esc(student.dataset.student)}</h2>${apps.map(a=>`<div class="detail-item"><h3>${esc(a.tipo)} · ${fmtDate(a.inicio)} ${pill(a.estado)}</h3>Puntaje global: <b>${esc(a.global_score ?? 'Sin resultado')}</b><br>Emocional: ${esc(a.emocional ?? '—')} · Conductual: ${esc(a.conductual ?? '—')} · Cognitiva: ${esc(a.cognitiva ?? '—')}</div>`).join('') || '<p>Sin evaluaciones registradas.</p>'}${missingLinks()}`;document.querySelector('#detail').showModal();}});
 document.querySelector('.close').onclick=()=>document.querySelector('#detail').close();
 window.addEventListener('hashchange',()=>{if(data) route();main.focus();});
 function startDashboard() {
 return loadData().then(result => {
   data = result;
+  signOut.hidden = !live;
   route();
   const label = live ? 'MariaDB · lectura en vivo' : 'Demo · datos ficticios';
   document.querySelector('#source-label').textContent = label;
@@ -114,7 +141,12 @@ return loadData().then(result => {
 
 }
 function showSignIn() {
-  main.innerHTML = '<section class="card"><h1>Iniciar sesión</h1><form id="sign-in"><label>Usuario<input name="username" autocomplete="username" required></label><label>Contraseña<input name="password" type="password" autocomplete="current-password" required></label><button class="primary" type="submit">Entrar</button><p id="login-status" role="status"></p></form></section>';
+  signOut.hidden = true;
+  document.body.classList.add('signed-out');
+  document.querySelector('#breadcrumb').textContent = 'Acceso al panel';
+  document.querySelector('#source-label').textContent = 'Sesión cerrada';
+  document.querySelector('.local-badge').textContent = 'Sesión cerrada';
+  main.innerHTML = '<section class="card login-card"><p class="eyebrow">PROCRASTINATOR</p><h1>Bienvenido de nuevo</h1><p class="subtitle">Inicia sesión para consultar el seguimiento estudiantil.</p><form id="sign-in"><label>Usuario<input name="username" autocomplete="username" required></label><label>Contraseña<input name="password" type="password" autocomplete="current-password" required></label><button class="primary" type="submit">Entrar</button><p id="login-status" role="status"></p></form></section>';
   const form = document.querySelector('#sign-in');
   form.addEventListener('submit', async event => {
     event.preventDefault();
@@ -128,6 +160,8 @@ function showSignIn() {
       const result = await response.json();
       if (!Array.isArray(result.students) || !Array.isArray(result.activities) || !Array.isArray(result.assessments)) throw Error();
       data = result;
+      document.body.classList.remove('signed-out');
+      signOut.hidden = false;
       form.reset();
       route();
       document.querySelector('#source-label').textContent = 'Actualización cada segundo';
@@ -138,7 +172,7 @@ function showSignIn() {
     }
   });
 }
-if (githubLive) showSignIn();
+if (live) showSignIn();
 else startDashboard();
 
 // Consultas periódicas sin peticiones superpuestas.
@@ -147,11 +181,13 @@ if (live) {
   setInterval(async () => {
     if (refreshing || !data) return;
     refreshing = true;
+    const version = sessionVersion;
     try {
       const response = await requestRecords();
       if (!response.ok) throw new Error('Consulta fallida');
       const next = await response.json();
       if (!Array.isArray(next.students) || !Array.isArray(next.activities) || !Array.isArray(next.assessments)) throw new Error('Respuesta inválida');
+      if (version !== sessionVersion || !data) return;
       const changed = JSON.stringify(next) !== JSON.stringify(data);
       data = next;
       if (changed) {
@@ -163,6 +199,7 @@ if (live) {
       document.querySelector('.local-badge').textContent = 'En vivo · ' + new Date().toLocaleTimeString('es-MX');
       document.querySelector('#source-label').textContent = 'Actualización cada segundo';
     } catch (error) {
+      if (version !== sessionVersion || !data) return;
       document.querySelector('.local-badge').textContent = 'Sin conexión · reintentando';
     } finally {
       refreshing = false;

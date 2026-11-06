@@ -10,3 +10,11 @@ GitHub Pages sirve el panel desde la raíz del repositorio. Abre el sitio y sigu
 4. Abre dashboard/live.php. Cada recarga lee los datos de la base en una transacción. El indicador MariaDB aparece tras una consulta correcta. dashboard/index.html abre siempre la demostración.
 
 Para Pages, selecciona la rama main y la carpeta raíz en Settings > Pages > Deploy from a branch.
+
+## Acceso y diseño móvil
+
+El panel privado solicita usuario y contraseña en su formulario. Las credenciales se conservan únicamente en memoria y las consultas no reutilizan credenciales guardadas por el navegador. Cerrar sesión elimina las credenciales y los registros visibles, cierra los detalles y detiene las consultas periódicas; las respuestas pendientes se descartan. Al recargar hay que iniciar sesión de nuevo. La autenticación HTTP del hosting sigue protegiendo los archivos PHP de forma independiente.
+
+En celular, el menú se despliega desde la cabecera y los listados de estudiantes y actividades se presentan como tarjetas. La vista previa de exportación mantiene desplazamiento horizontal para comparar columnas.
+
+Validación: `node dashboard/tools/check.cjs`. Con Playwright y Microsoft Edge instalados, `node dashboard/tools/check-mobile.cjs` comprueba seis pantallas a 320, 375, 390, 768 y 1280 px, navegación móvil y cierre de sesión con una consulta pendiente, usando datos ficticios. `SCREENSHOT_PATH` permite guardar una captura opcional.
