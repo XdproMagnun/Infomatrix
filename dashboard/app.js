@@ -1,7 +1,14 @@
-const live = document.documentElement.dataset.source === 'mariadb';
+const githubLive = location.hostname === 'xdpromagnun.github.io';
+const live = githubLive || document.documentElement.dataset.source === 'mariadb';
+const recordsUrl = githubLive ? 'https://unisalud.com.mx/procrast-panel/records.php' : 'records.php';
+let accessHeader = '';
+async function requestRecords() {
+  const headers = accessHeader ? {Authorization: accessHeader} : {};
+  return fetch(recordsUrl, {headers, cache: 'no-store', signal: AbortSignal.timeout(15000)});
+}
 async function loadData() {
   if (!live) return window.DASHBOARD_DATA;
-  const response = await fetch('records.php', {cache: 'no-store'});
+  const response = await requestRecords();
   if (!response.ok) throw new Error('Consulta fallida');
   return response.json();
 }
@@ -92,7 +99,8 @@ function route(){page=location.hash.slice(1) || 'resumen';if(!titles[page])page=
 main.addEventListener('click',e=>{const go=e.target.closest('[data-go]');if(go)location.hash=go.dataset.go;const pg=e.target.closest('[data-paginate]');if(pg){pageIndex+=Number(pg.dataset.paginate);(page==='estudiantes'?updateStudents:updateActivities)();}const detail=e.target.closest('[data-detail]'),student=e.target.closest('[data-student]');if(detail){const a=data.activities.find(a=>a.id===detail.dataset.detail);document.querySelector('#detail-content').innerHTML=`<p class="eyebrow">ACTIVIDAD #${esc(a.id)} · PLAN ${esc(a.plan_id)}</p><h2>Detalle de la respuesta</h2>${Object.entries(a).map(([k,v])=>`<div class="detail-item"><small>${esc(k)}</small>${esc(v ?? 'Sin dato')}</div>`).join('')}`;document.querySelector('#detail').showModal();}if(student){const apps=data.assessments.filter(a=>a.estudiante_id===student.dataset.student).sort((a,b)=>a.inicio.localeCompare(b.inicio));document.querySelector('#detail-content').innerHTML=`<p class="eyebrow">SEGUIMIENTO INDIVIDUAL</p><h2>Estudiante ID ${esc(student.dataset.student)}</h2>${apps.map(a=>`<div class="detail-item"><h3>${esc(a.tipo)} · ${fmtDate(a.inicio)} ${pill(a.estado)}</h3>Puntaje global: <b>${esc(a.global_score ?? 'Sin resultado')}</b><br>Emocional: ${esc(a.emocional ?? '—')} · Conductual: ${esc(a.conductual ?? '—')} · Cognitiva: ${esc(a.cognitiva ?? '—')}</div>`).join('') || '<p>Sin evaluaciones registradas.</p>'}${missingLinks()}`;document.querySelector('#detail').showModal();}});
 document.querySelector('.close').onclick=()=>document.querySelector('#detail').close();
 window.addEventListener('hashchange',()=>{if(data) route();main.focus();});
-loadData().then(result => {
+function startDashboard() {
+return loadData().then(result => {
   data = result;
   route();
   const label = live ? 'MariaDB · lectura en vivo' : 'Demo · datos ficticios';
@@ -104,6 +112,35 @@ loadData().then(result => {
   main.innerHTML = '<h1>No se pudieron cargar los datos</h1><p>Recarga la página o consulta al administrador.</p>';
 });
 
+}
+function showSignIn() {
+  main.innerHTML = '<section class="card"><h1>Iniciar sesión</h1><form id="sign-in"><label>Usuario<input name="username" autocomplete="username" required></label><label>Contraseña<input name="password" type="password" autocomplete="current-password" required></label><button class="primary" type="submit">Entrar</button><p id="login-status" role="status"></p></form></section>';
+  const form = document.querySelector('#sign-in');
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = form.querySelector('button');
+    button.disabled = true;
+    const fields = new FormData(form);
+    accessHeader = 'Basic ' + btoa(String(fields.get('username')) + ':' + String(fields.get('password')));
+    try {
+      const response = await requestRecords();
+      if (!response.ok) throw Error();
+      const result = await response.json();
+      if (!Array.isArray(result.students) || !Array.isArray(result.activities) || !Array.isArray(result.assessments)) throw Error();
+      data = result;
+      form.reset();
+      route();
+      document.querySelector('#source-label').textContent = 'Actualización cada segundo';
+    } catch {
+      accessHeader = '';
+      document.querySelector('#login-status').textContent = 'No se pudo entrar. Revisa tus datos o intenta de nuevo.';
+      button.disabled = false;
+    }
+  });
+}
+if (githubLive) showSignIn();
+else startDashboard();
+
 // Consultas periódicas sin peticiones superpuestas.
 if (live) {
   let refreshing = false;
@@ -111,7 +148,7 @@ if (live) {
     if (refreshing || !data) return;
     refreshing = true;
     try {
-      const response = await fetch('records.php', {cache: 'no-store', signal: AbortSignal.timeout(15000)});
+      const response = await requestRecords();
       if (!response.ok) throw new Error('Consulta fallida');
       const next = await response.json();
       if (!Array.isArray(next.students) || !Array.isArray(next.activities) || !Array.isArray(next.assessments)) throw new Error('Respuesta inválida');
