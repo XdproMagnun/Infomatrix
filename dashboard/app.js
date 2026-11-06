@@ -103,3 +103,32 @@ loadData().then(result => {
   document.querySelector('.local-badge').textContent = 'Error de carga';
   main.innerHTML = '<h1>No se pudieron cargar los datos</h1><p>Recarga la página o consulta al administrador.</p>';
 });
+
+// Consultas periódicas sin peticiones superpuestas.
+if (live) {
+  let refreshing = false;
+  setInterval(async () => {
+    if (refreshing || !data) return;
+    refreshing = true;
+    try {
+      const response = await fetch('records.php', {cache: 'no-store', signal: AbortSignal.timeout(15000)});
+      if (!response.ok) throw new Error('Consulta fallida');
+      const next = await response.json();
+      if (!Array.isArray(next.students) || !Array.isArray(next.activities) || !Array.isArray(next.assessments)) throw new Error('Respuesta inválida');
+      const changed = JSON.stringify(next) !== JSON.stringify(data);
+      data = next;
+      if (changed) {
+        if (page === 'resumen') overview();
+        if (page === 'estudiantes') updateStudents();
+        if (page === 'actividades') updateActivities();
+        if (page === 'exportaciones') updateExport();
+      }
+      document.querySelector('.local-badge').textContent = 'En vivo · ' + new Date().toLocaleTimeString('es-MX');
+      document.querySelector('#source-label').textContent = 'Actualización cada segundo';
+    } catch (error) {
+      document.querySelector('.local-badge').textContent = 'Sin conexión · reintentando';
+    } finally {
+      refreshing = false;
+    }
+  }, 1000);
+}
