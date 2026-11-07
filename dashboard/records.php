@@ -3,8 +3,15 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: private, no-store');
 $check = isset($_GET['conexion']) && $_GET['conexion'] === '1';
-if ($check) {
+header('Vary: Origin');
+if (($_SERVER['HTTP_ORIGIN'] ?? '') === 'https://xdpromagnun.github.io') {
     header('Access-Control-Allow-Origin: https://xdpromagnun.github.io');
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        header('Access-Control-Allow-Methods: GET');
+        header('Access-Control-Allow-Headers: Authorization');
+        http_response_code(204);
+        exit;
+    }
 }
 if (!$check && empty($_SERVER['REMOTE_USER'])) {
     http_response_code(403);
