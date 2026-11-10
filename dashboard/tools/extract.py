@@ -7,7 +7,7 @@ sql = (root.parent / 'unisalud_PROCRAST_IA.sql').read_text(encoding='utf-8')
 tables = {}
 for match in re.finditer(r'INSERT INTO `([^`]+)` \((.*?)\) VALUES\s*', sql):
     name, columns = match.group(1), re.findall(r'`([^`]+)`', match.group(2))
-    if name not in {'estudiantes', 'planes', 'actividades_plan', 'aplicaciones', 'catalogo_intervenciones'}:
+    if name not in {'estudiantes', 'planes', 'planes_personalizados', 'actividades_plan', 'aplicaciones', 'catalogo_intervenciones'}:
         continue
     rows, row, token, quoted, escaped = [], [], '', False, False
     for ch in sql[match.end():]:
@@ -36,10 +36,17 @@ for match in re.finditer(r'INSERT INTO `([^`]+)` \((.*?)\) VALUES\s*', sql):
 
 plans = {p['id']: p for p in tables.get('planes', [])}
 catalog = {p['id']: p for p in tables['catalogo_intervenciones']}
+personalized = {p['id']: p for p in tables.get('planes_personalizados', [])}
+by_assessment = {r['id']: r['estudiante_id'] for r in tables['aplicaciones']}
+by_chat = {s['telegram_chat_id']: s['id'] for s in tables['estudiantes']}
 activities = []
 for a in tables['actividades_plan']:
     p = plans.get(a['plan_id'], {})
-    activities.append({**{k:a[k] for k in ['id','plan_id','numero_semana','fecha_programada','estado','minutos_realizados','distractor','observacion','respondido_en','instrucciones']}, 'estudiante_id': p.get('estudiante_id'), 'dimension': catalog[a['intervencion_id']]['dimension']})
+    pp = personalized.get(a['plan_id'], {})
+    owners = {p.get('estudiante_id'), by_assessment.get(pp.get('aplicacion_id')), by_chat.get(pp.get('telegram_chat_id'))}
+    owners.discard(None)
+    student_id = owners.pop() if len(owners) == 1 else None
+    activities.append({**{k:a[k] for k in ['id','plan_id','numero_semana','fecha_programada','estado','minutos_realizados','distractor','observacion','respondido_en','instrucciones']}, 'estudiante_id': student_id, 'dimension': catalog[a['intervencion_id']]['dimension']})
 data = {'source':'Respaldo SQL · 23 oct 2026', 'students':[{k:s[k] for k in ['id','activo','consentimiento','creado_en']} for s in tables['estudiantes']], 'activities': activities, 'assessments':tables['aplicaciones']}
 (root / 'data.js').write_text('window.DASHBOARD_DATA = ' + json.dumps(data, ensure_ascii=False) + ';\n', encoding='utf-8')
 print({k:len(data[k]) for k in ['students','activities','assessments']})

@@ -46,9 +46,16 @@ try {
         'source' => 'MariaDB / unisalud_PROCRAST_IA',
         'students' => $db->query('SELECT id, activo, consentimiento, creado_en FROM estudiantes ORDER BY id')->fetchAll(),
         'assessments' => $db->query('SELECT id, estudiante_id, tipo, estado, inicio, fin, emocional, conductual, cognitiva, global_score, dimension_predominante FROM aplicaciones ORDER BY id')->fetchAll(),
-        'activities' => $db->query('SELECT a.id, p.estudiante_id, a.plan_id, a.numero_semana, a.fecha_programada, a.estado,
+        'activities' => $db->query('SELECT a.id,
+            CASE WHEN (p.estudiante_id IS NULL OR p.estudiante_id = COALESCE(ev.estudiante_id, alumno.id, p.estudiante_id))
+                  AND (ev.estudiante_id IS NULL OR alumno.id IS NULL OR ev.estudiante_id = alumno.id)
+                 THEN COALESCE(p.estudiante_id, ev.estudiante_id, alumno.id) END AS estudiante_id,
+            a.plan_id, a.numero_semana, a.fecha_programada, a.estado,
             a.minutos_realizados, a.distractor, a.observacion, a.respondido_en, a.instrucciones, c.dimension
             FROM actividades_plan a LEFT JOIN planes p ON p.id = a.plan_id
+            LEFT JOIN planes_personalizados pp ON pp.id = a.plan_id
+            LEFT JOIN aplicaciones ev ON ev.id = pp.aplicacion_id
+            LEFT JOIN estudiantes alumno ON alumno.telegram_chat_id = pp.telegram_chat_id
             LEFT JOIN catalogo_intervenciones c ON c.id = a.intervencion_id ORDER BY a.id')->fetchAll()
     ];
     $db->commit();

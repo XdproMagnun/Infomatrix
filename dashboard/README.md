@@ -6,7 +6,7 @@ GitHub Pages sirve el panel desde la raíz del repositorio. Abre el sitio y sigu
 
 1. Instala el panel en un servidor HTTPS con PHP 7.3 o superior y PDO MySQL, con acceso a la MariaDB del bot. Despliega los archivos versionados. Conserva el respaldo SQL y data.js fuera de cualquier directorio público.
 2. Protege la carpeta del panel con la autenticación del servidor web y limita el acceso al personal autorizado. El servidor debe establecer REMOTE_USER tras autenticar al usuario. Ambos archivos PHP rechazan peticiones sin esta identidad.
-3. Configura PROCRAST_DB_USER y PROCRAST_DB_PASSWORD en el entorno privado de PHP. Usa una cuenta de solo lectura sobre estudiantes, aplicaciones, actividades_plan, planes y catalogo_intervenciones de unisalud_PROCRAST_IA. PROCRAST_DB_HOST es opcional y por defecto vale localhost. Si la base está en otra máquina, usa un enlace privado seguro.
+3. Configura PROCRAST_DB_USER y PROCRAST_DB_PASSWORD en el entorno privado de PHP. Usa una cuenta de solo lectura sobre estudiantes, aplicaciones, actividades_plan, planes, planes_personalizados y catalogo_intervenciones de unisalud_PROCRAST_IA. PROCRAST_DB_HOST es opcional y por defecto vale localhost. Si la base está en otra máquina, usa un enlace privado seguro.
 4. Abre dashboard/live.php. Cada consulta lee los datos en una transacción. Para el acceso desde GitHub Pages, configura el hosting para que OPTIONS de records.php llegue al PHP sin solicitar autenticación. Mantén la autenticación obligatoria en las consultas GET de registros.
 
 Para Pages, selecciona la rama main y la carpeta raíz en Settings > Pages > Deploy from a branch.
